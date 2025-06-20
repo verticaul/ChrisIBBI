@@ -46,7 +46,7 @@ Untuk menjalankan proyek ini di lingkungan lokal Anda, ikuti langkah-langkah ber
 
 2.  **Clone Repositori**:
     ```bash
-    git clone [https://url-repositori-anda.git](https://url-repositori-anda.git)
+    git clone https://github.com/verticaul/ChrisIBBI.git
     cd CineCryptoApp
     ```
 
