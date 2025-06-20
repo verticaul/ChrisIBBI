@@ -302,6 +302,15 @@ export const useCineCrypto = () => {
             const rowNumber = Math.floor((Number(ticket.seatId) - 1) / 10);
             const seatNumberInRow = (Number(ticket.seatId) - 1) % 10 + 1;
             const seatLabel = `${String.fromCharCode(65 + rowNumber)}${seatNumberInRow}`;
+            
+            // Logika untuk status tiket
+            let status = 'Aktif';
+            const isUpcoming = startTime.getTime() > Date.now();
+            if (!isUpcoming) {
+                status = 'Kedaluwarsa';
+            } else if (Number(ticketId) % 2 !== 0) { // Simulasi tiket sudah di-scan
+                status = 'Sudah Digunakan';
+            }
 
             return {
                 ticketId: Number(ticketId),
@@ -310,7 +319,9 @@ export const useCineCrypto = () => {
                 date: startTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long' }),
                 time: startTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
                 seat: seatLabel,
-                isUpcoming: startTime.getTime() > Date.now(),
+                isUpcoming: isUpcoming,
+                status: status,
+                transactionHash: ticket.transactionHash || null // Asumsi txHash disimpan
             };
         });
 

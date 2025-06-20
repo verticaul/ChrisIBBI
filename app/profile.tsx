@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link, useRouter } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 
+
 // Komponen untuk avatar blockie sederhana
 const BlockieAvatar = ({ address, size }: { address: string, size: number }) => {
     const seed = address ? address.toLowerCase().slice(2, 10) : 'default';
@@ -18,31 +19,44 @@ const BlockieAvatar = ({ address, size }: { address: string, size: number }) => 
     return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: createColor() }} />;
 };
 
-// Komponen kartu tiket dengan desain baru
-const TicketCard = ({ ticket, onPress }: { ticket: any, onPress: () => void }) => (
-    <TouchableOpacity style={styles.ticketCard} activeOpacity={0.8} onPress={onPress}>
-        <View style={styles.ticketLeft}>
-            <Image 
-                source={{ uri: ticket.posterUrl || 'https://placehold.co/100x150/1E1E1E/E0E0E0?text=No+Poster' }} 
-                style={styles.ticketPoster} 
-            />
-        </View>
-        <View style={styles.ticketMiddle}>
-            <View style={styles.ticketTopCircle} />
-            <View style={styles.ticketDash} />
-            <View style={styles.ticketBottomCircle} />
-        </View>
-        <View style={styles.ticketRight}>
-            <Text style={styles.ticketMovieTitle} numberOfLines={1}>{ticket.movieTitle}</Text>
-            <Text style={styles.ticketDetailText}>{ticket.date}</Text>
-            <Text style={styles.ticketTimeSeat}>{ticket.time}  ·  Kursi {ticket.seat}</Text>
-            <View style={styles.qrIconContainer}>
-                <Ionicons name="qr-code-outline" size={18} color="#888" />
-                <Text style={styles.qrIconText}>Tampilkan Kode</Text>
+// Komponen kartu tiket dengan desain baru yang menampilkan status
+const TicketCard = ({ ticket, onPress }: { ticket: any, onPress: () => void }) => {
+    const isUsedOrExpired = ticket.status === 'Sudah Digunakan' || ticket.status === 'Kedaluwarsa';
+    
+    const statusInfo = {
+        'Aktif': { color: '#4CAF50', icon: 'checkmark-circle' },
+        'Sudah Digunakan': { color: '#FF9800', icon: 'scan-circle' },
+        'Kedaluwarsa': { color: '#9E9E9E', icon: 'time' }
+    };
+    const currentStatus = statusInfo[ticket.status as keyof typeof statusInfo] || statusInfo['Kedaluwarsa'];
+    
+    return (
+        <TouchableOpacity style={[styles.ticketCard, isUsedOrExpired && styles.usedTicketCard]} activeOpacity={0.8} onPress={onPress}>
+            <View style={styles.ticketLeft}>
+                <Image 
+                    source={{ uri: ticket.posterUrl || 'https://placehold.co/100x150/1E1E1E/E0E0E0?text=No+Poster' }} 
+                    style={styles.ticketPoster} 
+                />
+                 {isUsedOrExpired && <View style={styles.posterOverlay} />}
             </View>
-        </View>
-    </TouchableOpacity>
-);
+            <View style={styles.ticketMiddle}>
+                <View style={styles.ticketTopCircle} />
+                <View style={styles.ticketDash} />
+                <View style={styles.ticketBottomCircle} />
+            </View>
+            <View style={styles.ticketRight}>
+                <Text style={styles.ticketMovieTitle} numberOfLines={1}>{ticket.movieTitle}</Text>
+                <Text style={styles.ticketDetailText}>{ticket.date}</Text>
+                <Text style={styles.ticketTimeSeat}>{ticket.time}  ·  Kursi {ticket.seat}</Text>
+                
+                <View style={[styles.statusBadge, { backgroundColor: currentStatus.color }]}>
+                    <Ionicons name={currentStatus.icon as any} size={14} color="#fff" />
+                    <Text style={styles.statusText}>{ticket.status}</Text>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+};
 
 export default function ProfileScreen() {
     const router = useRouter();
@@ -91,7 +105,7 @@ export default function ProfileScreen() {
     const upcomingTickets = myTickets.filter(t => t.isUpcoming);
     const pastTickets = myTickets.filter(t => !t.isUpcoming);
     const ticketsToShow = activeTab === 'active' ? upcomingTickets : pastTickets;
-    
+
     const renderContent = () => {
         if (isLoading) { return <ActivityIndicator style={{ marginTop: 50 }} size="large" color="#FFC107" />; }
 
@@ -133,35 +147,27 @@ export default function ProfileScreen() {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
-                    <Ionicons name="arrow-back" size={24} color="#E0E0E0" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Tiket Saya</Text>
-                <View style={{ width: 40 }} /> 
-            </View>
+            <View style={{flex: 1}}>
+                <ScrollView 
+                    contentContainerStyle={{ paddingBottom: 80 }}
+                    refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFC107" />}
+                >
+                    {isConnected && (
+                        <View style={styles.profileHeader}>
+                            <BlockieAvatar address={address || ''} size={60} />
+                            <Text style={styles.addressText} numberOfLines={1}>{address}</Text>
+                            <TouchableOpacity style={styles.disconnectButton} onPress={() => open({ view: 'Account' })}><Text style={styles.disconnectText}>Disconnect</Text></TouchableOpacity>
+                        </View>
+                    )}
 
-            <ScrollView
-                contentContainerStyle={{ paddingBottom: 20 }}
-                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor="#FFC107" />}
-            >
-                {isConnected && (
-                    <View style={styles.profileHeader}>
-                        <BlockieAvatar address={address || ''} size={60} />
-                        <Text style={styles.addressText} numberOfLines={1}>{address}</Text>
-                        <TouchableOpacity style={styles.disconnectButton} onPress={() => open({ view: 'Account' })}><Text style={styles.disconnectText}>Disconnect</Text></TouchableOpacity>
+                    <View style={styles.tabSwitcher}>
+                        <TouchableOpacity onPress={() => setActiveTab('active')} style={[styles.tabButton, activeTab === 'active' && styles.activeTabButton]}><Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>Tiket Aktif ({upcomingTickets.length})</Text></TouchableOpacity>
+                        <TouchableOpacity onPress={() => setActiveTab('history')} style={[styles.tabButton, activeTab === 'history' && styles.activeTabButton]}><Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>Riwayat ({pastTickets.length})</Text></TouchableOpacity>
                     </View>
-                )}
 
-                <View style={styles.tabSwitcher}>
-                    <TouchableOpacity onPress={() => setActiveTab('active')} style={[styles.tabButton, activeTab === 'active' && styles.activeTabButton]}><Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>Tiket Aktif ({upcomingTickets.length})</Text></TouchableOpacity>
-                    <TouchableOpacity onPress={() => setActiveTab('history')} style={[styles.tabButton, activeTab === 'history' && styles.activeTabButton]}><Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>Riwayat ({pastTickets.length})</Text></TouchableOpacity>
-                </View>
-
-                {renderContent()}
-            </ScrollView>
-
-            {/* Modal untuk QR Code */}
+                    <View style={{paddingHorizontal: 20}}>{renderContent()}</View>
+                </ScrollView>
+            </View>
             <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
                 <View style={styles.modalContainer}>
                     <View style={styles.modalContent}>
@@ -190,10 +196,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#121212' },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, backgroundColor: '#1E1E1E' },
-    headerButton: { padding: 4 },
-    headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#E0E0E0' },
-    profileHeader: { paddingVertical: 24, alignItems: 'center', backgroundColor: '#1E1E1E' },
+    profileHeader: { paddingVertical: 24, alignItems: 'center', backgroundColor: '#1E1E1E', borderBottomWidth: 1, borderBottomColor: '#333' },
     addressText: { marginTop: 12, fontSize: 16, color: '#888', fontFamily: 'monospace' },
     disconnectButton: { marginTop: 16, borderColor: '#FFC107', borderWidth: 1, paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
     disconnectText: { color: '#FFC107', fontWeight: 'bold' },
@@ -207,9 +210,11 @@ const styles = StyleSheet.create({
     emptyText: { marginTop: 16, fontSize: 16, color: '#888', textAlign: 'center' },
     connectButton: { backgroundColor: '#FFC107', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8, marginTop: 20 },
     connectButtonText: { color: '#121212', fontWeight: 'bold' },
-    ticketCard: { flexDirection: 'row', backgroundColor: '#1E1E1E', borderRadius: 12, marginHorizontal: 20, marginBottom: 16, height: 120, elevation: 3, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10 },
+    ticketCard: { flexDirection: 'row', backgroundColor: '#1E1E1E', borderRadius: 12, marginBottom: 16, height: 120, elevation: 3, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 10 },
+    usedTicketCard: { opacity: 0.6 },
     ticketLeft: { width: 80, borderTopLeftRadius: 12, borderBottomLeftRadius: 12, overflow: 'hidden' },
     ticketPoster: { width: '100%', height: '100%' },
+    posterOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
     ticketMiddle: { width: 20, alignItems: 'center', overflow: 'hidden' },
     ticketTopCircle: { height: 10, width: 20, backgroundColor: '#121212', borderBottomLeftRadius: 10, borderBottomRightRadius: 10, marginTop: -1 },
     ticketBottomCircle: { height: 10, width: 20, backgroundColor: '#121212', borderTopLeftRadius: 10, borderTopRightRadius: 10, marginBottom: -1 },
@@ -218,8 +223,8 @@ const styles = StyleSheet.create({
     ticketMovieTitle: { fontSize: 16, fontWeight: 'bold', color: '#E0E0E0' },
     ticketDetailText: { fontSize: 12, color: '#888' },
     ticketTimeSeat: { fontSize: 14, fontWeight: '600', color: '#BDBDBD' },
-    qrIconContainer: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', opacity: 0.7 },
-    qrIconText: { marginLeft: 4, fontSize: 10, color: '#888' },
+    statusBadge: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, alignSelf: 'flex-start', marginTop: 'auto' },
+    statusText: { color: '#fff', fontSize: 10, fontWeight: 'bold', marginLeft: 4 },
     modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.8)' },
     modalContent: { width: '85%', backgroundColor: '#1E1E1E', borderRadius: 20, padding: 24, alignItems: 'center' },
     closeButton: { position: 'absolute', top: 10, right: 10 },

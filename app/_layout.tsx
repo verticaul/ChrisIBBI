@@ -1,6 +1,3 @@
-// FILE: app/_layout.tsx
-
-// Polyfill wajib, harus diimpor di paling atas
 import 'react-native-get-random-values';
 import '@walletconnect/react-native-compat';
 
@@ -12,10 +9,9 @@ import {
 } from "@reown/appkit-ethers-react-native";
 // Impor GestureHandlerRootView untuk stabilitas modal dan gestur
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-// === BAGIAN DIPERBARUI: Impor hook yang dibutuhkan ===
+// Impor hook yang dibutuhkan
 import { useFonts } from 'expo-font';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
 
 // Tahan splash screen agar tidak hilang secara otomatis
 SplashScreen.preventAutoHideAsync();
@@ -42,9 +38,6 @@ const chains = [sepolia];
 createAppKit({ projectId, chains, config, enableAnalytics: true });
 
 export default function RootLayout() {
-  // === BAGIAN DIPERBARUI: Logika untuk splash screen dan tema ===
-  const colorScheme = useColorScheme();
-
   // Memuat font kustom jika ada
   const [fontsLoaded] = useFonts({
     // Tambahkan font Anda di sini jika ada, contoh:
@@ -71,9 +64,8 @@ export default function RootLayout() {
         <Stack.Screen name="movie/[id]" />
         <Stack.Screen name="booking/[showtimeId]" />
       </Stack>
-      
-      {/* Melewatkan tema perangkat ke modal AppKit */}
-      <AppKit themeMode={colorScheme === 'dark' ? 'dark' : 'light'} />
+    
+      <AppKit />
     </GestureHandlerRootView>
   );
 }
