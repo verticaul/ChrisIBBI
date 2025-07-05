@@ -1,12 +1,12 @@
-import 'react-native-get-random-values';
 import '@walletconnect/react-native-compat';
+import 'react-native-get-random-values';
 
-import { Stack, SplashScreen } from 'expo-router';
 import {
+  AppKit,
   createAppKit,
   defaultConfig,
-  AppKit,
 } from "@reown/appkit-ethers-react-native";
+import { SplashScreen, Stack } from 'expo-router';
 // Impor GestureHandlerRootView untuk stabilitas modal dan gestur
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 // Impor hook yang dibutuhkan
@@ -32,6 +32,7 @@ const sepolia = {
   currency: "SepoliaETH", 
   explorerUrl: "https://sepolia.etherscan.io", 
   rpcUrl: "https://ethereum-sepolia-rpc.publicnode.com" 
+  // rpcUrl: "wss://sepolia.gateway.tenderly.co" 
 };
 const chains = [sepolia];
 

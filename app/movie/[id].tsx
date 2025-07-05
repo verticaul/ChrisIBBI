@@ -1,206 +1,229 @@
-// FILE: app/movie/[id].tsx
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, ImageBackground,
+  ActivityIndicator, TouchableOpacity, SafeAreaView, Linking, Alert, Image
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ImageBackground, ScrollView, ActivityIndicator, Image, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { useCineCrypto } from '../../hooks/useCineCrypto';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
+import { Movie, ShowtimeGroup, Actor } from '../../constants/types';
 
-// Komponen untuk kartu aktor
-const ActorCard = ({ actor }: { actor: any }) => (
-    <View style={styles.actorCard}>
-        <Image 
-            source={{ uri: actor.profile_path ? `https://image.tmdb.org/t/p/w185${actor.profile_path}` : 'https://placehold.co/185x278/1E1E1E/E0E0E0?text=No+Image' }} 
-            style={styles.actorImage} 
-        />
-        <Text style={styles.actorName} numberOfLines={2}>{actor.name}</Text>
-    </View>
+// --- Komponen-komponen UI ---
+
+const GenreTag = ({ genre }: { genre: { name: string } }) => (
+  <View style={styles.genreTag}>
+    <Text style={styles.genreText}>{genre.name}</Text>
+  </View>
 );
 
+const ActorCard = ({ actor }: { actor: Actor }) => (
+  <View style={styles.actorCard}>
+    <Image
+      source={{ uri: actor.profile_path ? `https://image.tmdb.org/t/p/w185${actor.profile_path}` : 'https://placehold.co/100x150/1E1E1E/E0E0E0?text=N/A' }}
+      style={styles.actorImage}
+    />
+    <Text style={styles.actorName} numberOfLines={2}>{actor.name}</Text>
+  </View>
+);
+
+const ShowtimeSection = ({ showtimes, onSelect }: { showtimes: ShowtimeGroup[]; onSelect: (id: number) => void }) => {
+  const [selectedDate, setSelectedDate] = useState(showtimes[0]?.date);
+
+  const selectedShowtimeGroup = showtimes.find(group => group.date === selectedDate);
+
+  return (
+    <View style={styles.showtimeContainer}>
+      <Text style={styles.sectionTitle}>Jadwal Tayang</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateScroller}>
+        {showtimes.map(group => (
+          <TouchableOpacity
+            key={group.date}
+            style={[styles.dateChip, selectedDate === group.date && styles.activeDateChip]}
+            onPress={() => setSelectedDate(group.date)}
+          >
+            <Text style={[styles.dateChipText, selectedDate === group.date && styles.activeDateChipText]}>{group.formattedDate.split(', ')[1]}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <View style={styles.timeGrid}>
+        {selectedShowtimeGroup?.times.map(time => (
+          <TouchableOpacity
+            key={time.id}
+            style={styles.timeChip}
+            onPress={() => onSelect(time.id)}
+          >
+            <Text style={styles.timeChipText}>{time.timeString}</Text>
+            <Text style={styles.priceChipText}>{time.price} ETH</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+};
+
 export default function MovieDetailScreen() {
-    const router = useRouter();
-    const { id } = useLocalSearchParams();
-    const { getMovieDetails } = useCineCrypto();
-    
-    const [movie, setMovie] = useState<any>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [youtubeKey, setYoutubeKey] = useState<string | null>(null);
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const [selectedShowtimeId, setSelectedShowtimeId] = useState<number | null>(null);
+  const router = useRouter();
+  const { id, isTmdb } = useLocalSearchParams<{ id: string; isTmdb?: string }>();
+  const { getMovieDetails } = useCineCrypto();
 
-    useEffect(() => {
-        const loadDetails = async () => {
-            if (id && typeof id === 'string') {
-                setIsLoading(true);
-                const details = await getMovieDetails(parseInt(id, 10));
-                setMovie(details);
+  const [movie, setMovie] = useState<Movie | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-                if (details?.groupedShowtimes && details.groupedShowtimes.length > 0) {
-                    setSelectedDate(details.groupedShowtimes[0].date);
-                }
+  const loadMovieDetails = useCallback(async () => {
+    if (!id) return;
+    setIsLoading(true);
+    const details = await getMovieDetails(Number(id), isTmdb === 'true');
+    setMovie(details);
+    setIsLoading(false);
+  }, [id, isTmdb, getMovieDetails]);
 
-                if (details?.videos?.results) {
-                    const trailer = details.videos.results.find(
-                        (video: any) => video.site === 'YouTube' && video.type === 'Trailer'
-                    );
-                    setYoutubeKey(trailer?.key || null);
-                }
-                setIsLoading(false);
-            }
-        };
-        loadDetails();
-    }, [id, getMovieDetails]);
+  useEffect(() => {
+    loadMovieDetails();
+  }, [loadMovieDetails]);
 
-    const handleBooking = () => {
-        if (selectedShowtimeId) {
-            router.push(`/booking/${selectedShowtimeId}`);
-        } else {
-            Alert.alert("Perhatian", "Silakan pilih jam tayang terlebih dahulu.");
-        }
-    };
-    
-    const renderDateTab = ({ item }: { item: any }) => {
-        const dateObj = new Date(item.date);
-        const day = dateObj.toLocaleDateString('id-ID', { day: '2-digit' });
-        const month = dateObj.toLocaleDateString('id-ID', { month: 'short' });
-        const dayName = dateObj.toLocaleDateString('id-ID', { weekday: 'short' });
-        const isActive = selectedDate === item.date;
-
-        return (
-            <TouchableOpacity 
-                style={[styles.dateTab, isActive && styles.activeDateTab]}
-                onPress={() => {
-                    setSelectedDate(item.date)
-                    setSelectedShowtimeId(null);
-                }}
-            >
-                <Text style={[styles.dateTabDayName, isActive && styles.activeDateTabText]}>{dayName.toUpperCase()}</Text>
-                <Text style={[styles.dateTabDay, isActive && styles.activeDateTabText]}>{day} {month}</Text>
-            </TouchableOpacity>
-        );
-    };
-
-    if (isLoading) {
-        return <SafeAreaView style={styles.loadingContainer}><ActivityIndicator size="large" color="#FFC107" /></SafeAreaView>;
+  const handlePlayTrailer = () => {
+    const trailer = movie?.videos?.results.find(v => v.type === 'Trailer' && v.site === 'YouTube');
+    if (trailer) {
+      Linking.openURL(`https://www.youtube.com/watch?v=${trailer.key}`);
+    } else {
+      Alert.alert("Trailer Tidak Tersedia", "Maaf, trailer untuk film ini tidak dapat ditemukan.");
     }
+  };
 
-    if (!movie) {
-        return (
-            <SafeAreaView style={styles.loadingContainer}>
-                <Text style={styles.errorText}>Film tidak ditemukan.</Text>
-                <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}><Text style={{ color: '#FFC107' }}>Kembali</Text></TouchableOpacity>
-            </SafeAreaView>
-        );
-    }
-    
-    const timesForSelectedDate = movie.groupedShowtimes?.find((g: any) => g.date === selectedDate)?.times || [];
-
+  if (isLoading) {
     return (
-        <View style={styles.container}>
-            <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
-                <ImageBackground source={{ uri: movie.backdropUrl }} style={styles.backdrop}>
-                    <SafeAreaView>
-                        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-                            <Ionicons name="chevron-back" size={28} color="white" />
-                        </TouchableOpacity>
-                    </SafeAreaView>
-                </ImageBackground>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FFC107" />
+      </View>
+    );
+  }
 
-                <View style={styles.headerSection}>
-                    <Image source={{ uri: movie.posterUrl }} style={styles.poster} />
-                    <View style={styles.titleContainer}>
-                        <Text style={styles.title}>{movie.title}</Text>
-                        <View style={styles.ratingContainer}>
-                            <Ionicons name="star" size={20} color="#F5C518" />
-                            <Text style={styles.ratingText}>{movie.vote_average?.toFixed(1)} / 10</Text>
-                        </View>
-                        {movie.runtime && <Text style={styles.runtimeText}>{movie.runtime} menit</Text>}
-                    </View>
+  if (!movie) {
+    return (
+      <SafeAreaView style={styles.container}>
+         <TouchableOpacity onPress={() => router.back()} style={styles.backButtonAbsolute}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+        <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={48} color="#555" />
+            <Text style={styles.errorText}>Film tidak dapat ditemukan.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+        <ImageBackground source={{ uri: movie.backdropUrl || undefined }} style={styles.backdrop}>
+          <View style={styles.backdropOverlay} />
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handlePlayTrailer} style={styles.playButton}>
+            <Ionicons name="play-circle" size={72} color="rgba(255, 255, 255, 0.9)" />
+          </TouchableOpacity>
+        </ImageBackground>
+
+        <View style={styles.mainContent}>
+            <View style={styles.posterContainer}>
+                <Image source={{ uri: movie.posterUrl || undefined }} style={styles.posterImage} />
+            </View>
+            <View style={styles.titleContainer}>
+                <Text style={styles.title}>{movie.title}</Text>
+                <View style={styles.metaInfo}>
+                    <Ionicons name="star" size={16} color="#F5C518" />
+                    <Text style={styles.metaText}>{movie.vote_average?.toFixed(1)}</Text>
+                    {movie.runtime && (
+                        <>
+                            <Text style={styles.metaSeparator}>|</Text>
+                            <Ionicons name="time-outline" size={16} color="#ccc" />
+                            <Text style={styles.metaText}>{movie.runtime} menit</Text>
+                        </>
+                    )}
                 </View>
-
-                <View style={styles.genreContainer}>
-                    {movie.genres?.slice(0, 3).map((genre: any) => (
-                        <View key={genre.id} style={styles.genreChip}><Text style={styles.genreText}>{genre.name}</Text></View>
-                    ))}
-                </View>
-
-                <View style={styles.detailsSection}><Text style={styles.sectionTitle}>Sinopsis</Text><Text style={styles.overview}>{movie.overview}</Text></View>
-
-                {movie.credits?.cast?.length > 0 && (<View style={styles.detailsSection}><Text style={styles.sectionTitle}>Pemeran Utama</Text><FlatList data={movie.credits.cast.slice(0, 10)} renderItem={({ item }) => <ActorCard actor={item} />} keyExtractor={(item) => item.id.toString()} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20 }} style={{ marginHorizontal: -20 }} /></View>)}
-
-                {youtubeKey && (<View style={styles.detailsSection}><Text style={styles.sectionTitle}>Trailer</Text><View style={styles.trailerContainer}><WebView style={{ flex: 1, backgroundColor: '#000' }} source={{ uri: `https://www.youtube.com/embed/${youtubeKey}` }} /></View></View>)}
-                
-                {movie.isBookable && movie.groupedShowtimes?.length > 0 && (
-                    <View style={styles.scheduleSection}>
-                        <Text style={styles.sectionTitle}>Pilih Jadwal</Text>
-                        <FlatList data={movie.groupedShowtimes} renderItem={renderDateTab} keyExtractor={(item) => item.date} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, marginBottom: 16 }} />
-                        <View style={styles.showtimeContainer}>
-                            {timesForSelectedDate.length > 0 ? (
-                                timesForSelectedDate.map((showtime: any) => (
-                                    <TouchableOpacity 
-                                        key={showtime.id} 
-                                        style={[styles.showtimeChip, selectedShowtimeId === showtime.id && styles.activeShowtimeChip]}
-                                        onPress={() => setSelectedShowtimeId(showtime.id)}
-                                    ><Text style={[styles.showtimeText, selectedShowtimeId === showtime.id && styles.activeShowtimeText]}>{showtime.timeString}</Text></TouchableOpacity>
-                                ))
-                            ) : ( <Text style={styles.noShowtimeText}>Tidak ada jadwal di tanggal ini.</Text> )}
-                        </View>
-                    </View>
-                )}
+            </View>
+        </View>
+        
+        <View style={styles.detailsSection}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.genreContainer}>
+                {movie.genres?.map(genre => <GenreTag key={genre.id} genre={genre} />)}
             </ScrollView>
-            
-            {movie.isBookable && movie.groupedShowtimes?.length > 0 && (
-                 <View style={styles.ctaContainer}>
-                    <TouchableOpacity 
-                        style={[styles.ctaButton, !selectedShowtimeId && styles.ctaButtonDisabled]}
-                        disabled={!selectedShowtimeId}
-                        onPress={handleBooking}
-                    ><Text style={styles.ctaButtonText}>Pilih Kursi</Text></TouchableOpacity>
-                </View>
+
+            <Text style={styles.sectionTitle}>Sinopsis</Text>
+            <Text style={styles.overview}>{movie.overview}</Text>
+
+            {movie.credits?.cast && movie.credits.cast.length > 0 && (
+                <>
+                    <Text style={styles.sectionTitle}>Pemeran Utama</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.actorList}>
+                        {movie.credits.cast.slice(0, 10).map(actor => <ActorCard key={actor.id} actor={actor} />)}
+                    </ScrollView>
+                </>
+            )}
+
+            {movie.isBookable && movie.groupedShowtimes && movie.groupedShowtimes.length > 0 && (
+                <ShowtimeSection 
+                    showtimes={movie.groupedShowtimes}
+                    onSelect={(showtimeId) => router.push(`/booking/${showtimeId}`)}
+                />
             )}
         </View>
-    );
-}
+      </ScrollView>
 
+      {movie.isBookable && (
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={styles.bookButton}
+            onPress={() => Alert.alert("Pilih Jadwal", "Silakan pilih tanggal dan jam tayang di atas untuk melanjutkan.")}
+          >
+            <Text style={styles.bookButtonText}>Pilih Jadwal & Beli Tiket</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#121212' },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' },
-    errorText: { color: '#E0E0E0', fontSize: 16 },
-    backdrop: { width: '100%', height: 280 },
-    backButton: { position: 'absolute', top: 50, left: 20, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-    headerSection: { flexDirection: 'row', paddingHorizontal: 20, marginTop: -80 },
-    poster: { width: 130, height: 195, borderRadius: 12, borderWidth: 3, borderColor: '#121212' },
+    errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    errorText: { color: '#888', marginTop: 10, fontSize: 16 },
+    backdrop: { height: 280, justifyContent: 'center', alignItems: 'center' },
+    backdropOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(18, 18, 18, 0.6)' },
+    backButton: { position: 'absolute', top: 50, left: 20, backgroundColor: 'rgba(0,0,0,0.5)', padding: 8, borderRadius: 20 },
+    backButtonAbsolute: { position: 'absolute', top: 50, left: 20, zIndex: 1 },
+    playButton: {},
+    mainContent: { flexDirection: 'row', marginTop: -80, paddingHorizontal: 20 },
+    posterContainer: { width: 120, height: 180, borderRadius: 12, elevation: 10, shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 10 },
+    posterImage: { width: '100%', height: '100%', borderRadius: 12 },
     titleContainer: { flex: 1, marginLeft: 16, justifyContent: 'flex-end', paddingBottom: 10 },
-    title: { fontSize: 26, fontWeight: 'bold', color: '#E0E0E0' },
-    ratingContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-    ratingText: { marginLeft: 6, fontSize: 16, fontWeight: '600', color: '#E0E0E0' },
-    runtimeText: { marginLeft: 12, fontSize: 16, fontWeight: '600', color: '#888' },
-    genreContainer: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, marginTop: 16 },
-    genreChip: { backgroundColor: '#1E1E1E', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, marginRight: 8, marginBottom: 8, },
-    genreText: { fontSize: 12, fontWeight: '600', color: '#E0E0E0' },
-    detailsSection: { marginTop: 30 },
-    scheduleSection: { marginTop: 30, paddingBottom: 20 },
-    sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#E0E0E0', marginBottom: 16, paddingHorizontal: 20 },
-    overview: { fontSize: 15, lineHeight: 22, color: '#BDBDBD', paddingHorizontal: 20 },
-    dateTab: { backgroundColor: '#1E1E1E', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, marginRight: 12, alignItems: 'center' },
-    activeDateTab: { backgroundColor: '#FFC107' },
-    dateTabDayName: { fontSize: 12, color: '#888', fontWeight: 'bold' },
-    dateTabDay: { fontSize: 14, fontWeight: 'bold', color: '#E0E0E0', marginTop: 2 },
-    activeDateTabText: { color: '#121212' },
-    showtimeContainer: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20 },
-    showtimeChip: { borderWidth: 1, borderColor: '#333', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, marginRight: 12, marginBottom: 12 },
-    activeShowtimeChip: { backgroundColor: '#FFC107', borderColor: '#FFC107' },
-    showtimeText: { fontSize: 16, fontWeight: '600', color: '#E0E0E0' },
-    activeShowtimeText: { color: '#121212' },
-    noShowtimeText: { color: '#888', fontStyle: 'italic', paddingHorizontal: 20 },
-    ctaContainer: { position: 'absolute', bottom: 0, width: '100%', padding: 20, paddingTop: 10, backgroundColor: '#121212', borderTopWidth: 1, borderTopColor: '#1E1E1E' },
-    ctaButton: { backgroundColor: '#FFC107', padding: 16, borderRadius: 12, alignItems: 'center' },
-    ctaButtonDisabled: { backgroundColor: '#333' },
-    ctaButtonText: { color: '#121212', fontSize: 18, fontWeight: 'bold' },
+    title: { fontSize: 24, fontWeight: 'bold', color: '#fff', textShadowColor: 'rgba(0, 0, 0, 0.75)', textShadowOffset: {width: -1, height: 1}, textShadowRadius: 10 },
+    metaInfo: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+    metaText: { color: '#ccc', marginLeft: 4, fontSize: 14, fontWeight: '600' },
+    metaSeparator: { color: '#555', marginHorizontal: 8, fontSize: 18 },
+    detailsSection: { padding: 20 },
+    genreContainer: { paddingBottom: 16 },
+    genreTag: { backgroundColor: '#2a2a2a', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, marginRight: 8 },
+    genreText: { color: '#ccc', fontSize: 12 },
+    sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#fff', marginTop: 16, marginBottom: 12 },
+    overview: { fontSize: 15, color: '#BDBDBD', lineHeight: 22 },
+    actorList: { paddingBottom: 10 },
     actorCard: { width: 100, marginRight: 12, alignItems: 'center' },
-    actorImage: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#1E1E1E' },
-    actorName: { marginTop: 8, textAlign: 'center', fontSize: 12, color: '#BDBDBD' },
-    trailerContainer: { width: '90%', height: 200, borderRadius: 12, overflow: 'hidden', backgroundColor: '#000', alignSelf: 'center' }
+    actorImage: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#333' },
+    actorName: { color: '#ccc', fontSize: 12, marginTop: 6, textAlign: 'center' },
+    showtimeContainer: { marginTop: 16 },
+    dateScroller: { paddingBottom: 16 },
+    dateChip: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, marginRight: 10, backgroundColor: '#2a2a2a' },
+    activeDateChip: { backgroundColor: '#FFC107' },
+    dateChipText: { color: '#fff', fontWeight: '600' },
+    activeDateChipText: { color: '#121212' },
+    timeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    timeChip: { backgroundColor: '#2a2a2a', padding: 12, borderRadius: 8, alignItems: 'center', minWidth: 90 },
+    timeChipText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+    priceChipText: { color: '#FFC107', fontSize: 12, marginTop: 4 },
+    footer: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 20, borderTopWidth: 1, borderColor: '#2a2a2a', backgroundColor: 'rgba(18, 18, 18, 0.9)' },
+    bookButton: { backgroundColor: '#FFC107', padding: 16, borderRadius: 12, alignItems: 'center' },
+    bookButtonText: { color: '#121212', fontSize: 18, fontWeight: 'bold' },
 });
