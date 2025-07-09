@@ -64,7 +64,7 @@ const TicketCard = ({ ticket, onShowQR, onRefund, isProcessing }: {
                 </View>
             </TouchableOpacity>
 
-            {canRefund && (
+            {/* {canRefund && (
                 <View style={styles.ticketActions}>
                     {isProcessing ? <ActivityIndicator color="#FFC107"/> : (
                         <TouchableOpacity style={styles.actionButton} onPress={onRefund}>
@@ -73,7 +73,7 @@ const TicketCard = ({ ticket, onShowQR, onRefund, isProcessing }: {
                         </TouchableOpacity>
                     )}
                 </View>
-            )}
+            )} */}
         </View>
     );
 };

@@ -81,6 +81,4 @@ Struktur proyek ini dirancang agar bersih dan mudah dikelola:
 -   **/hooks**: Tempat untuk _custom hooks_ yang berisi logika bisnis dan pengambilan data, seperti `useCineCrypto.ts`.
 -   **/services**: Berisi fungsi-fungsi untuk berinteraksi dengan API eksternal seperti TMDB.
 
----
 
-Terima kasih telah menjadi pendamping coding saya dalam membangun proyek ini!
